@@ -22,6 +22,7 @@
 
 #include "System.h"
 #include "Converter.h"
+#include "System_utils.h"
 #include <thread>
 #include <pangolin/pangolin.h>
 #include <iomanip>
@@ -56,7 +57,6 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
        cerr << "Failed to open settings file at: " << strSettingsFile << endl;
        exit(-1);
     }
-
 
     //Load ORB Vocabulary
     cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
@@ -113,13 +113,64 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     mpLoopCloser->SetLocalMapper(mpLocalMapper);
 }
 
+cv::Mat System::TrackStereoHuman(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp)
+{
+  if(mSensor!=STEREO)
+  {
+      cerr << "ERROR: you called TrackStereo but input sensor was not set to STEREO." << endl;
+      exit(-1);
+  }
+
+  // Check mode change
+  {
+      unique_lock<mutex> lock(mMutexMode);
+      if(mbActivateLocalizationMode)
+      {
+          mpLocalMapper->RequestStop();
+
+          // Wait until Local Mapping has effectively stopped
+          while(!mpLocalMapper->isStopped())
+          {
+              usleep(1000);
+          }
+
+          mpTracker->InformOnlyTracking(true);
+          mbActivateLocalizationMode = false;
+      }
+      if(mbDeactivateLocalizationMode)
+      {
+          mpTracker->InformOnlyTracking(false);
+          mpLocalMapper->Release();
+          mbDeactivateLocalizationMode = false;
+      }
+  }
+
+  // Check reset
+  {
+  unique_lock<mutex> lock(mMutexReset);
+  if(mbReset)
+  {
+      mpTracker->Reset();
+      mbReset = false;
+  }
+  }
+  
+  cv::Mat Tcw = mpTracker->GrabImageStereo(imLeft,imRight,timestamp);
+
+  unique_lock<mutex> lock2(mMutexState);
+  mTrackingState = mpTracker->mState;
+  mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
+  mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
+  return Tcw;
+}
+
 cv::Mat System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp)
 {
     if(mSensor!=STEREO)
     {
         cerr << "ERROR: you called TrackStereo but input sensor was not set to STEREO." << endl;
         exit(-1);
-    }   
+    }
 
     // Check mode change
     {
@@ -170,7 +221,7 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
     {
         cerr << "ERROR: you called TrackRGBD but input sensor was not set to RGBD." << endl;
         exit(-1);
-    }    
+    }
 
     // Check mode change
     {
@@ -488,5 +539,30 @@ vector<cv::KeyPoint> System::GetTrackedKeyPointsUn()
     unique_lock<mutex> lock(mMutexState);
     return mTrackedKeyPointsUn;
 }
+
+void System::ReadAllHumanPoses(int nframes){
+  Eigen::MatrixXd humans;
+  for(int i = 0; i < nframes; i++){
+    char frame_index_c[256];  sprintf(frame_index_c,"%06d", i);
+    std::string pose_path_left = folder_path + "/image_0_openpose/" + frame_index_c + ".txt";
+    if(!read_number_txt(pose_path_left, humans, 54)){
+      //can't find the pose or
+      humans.resize(0,54);
+    }
+    all_human_poses_left.push_back(humans);
+
+    std::string pose_path_right = folder_path + "/image_1_openpose/" + frame_index_c + ".txt";
+    if(!read_number_txt(pose_path_right, humans, 54)){
+      //can't find the pose or
+      humans.resize(0,54);
+    }
+    all_human_poses_right.push_back(humans);
+  }
+}
+
+void System::SetDataPath(std::string path){
+  folder_path = path;
+}
+
 
 } //namespace ORB_SLAM

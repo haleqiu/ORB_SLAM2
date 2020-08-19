@@ -66,6 +66,12 @@ public:
     // Returns the camera pose (empty if tracking fails).
     cv::Mat TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp);
 
+    // Proccess the given stereo frame and human pose. Images must be synchronized and rectified.
+    // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
+    // Returns the camera pose (empty if tracking fails).
+    // the human pose will be inputed as Eigen
+    cv::Mat TrackStereoHuman(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp);
+
     // Process the given rgbd frame. Depthmap must be registered to the RGB frame.
     // Input image: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
     // Input depthmap: Float (CV_32F).
@@ -122,7 +128,16 @@ public:
     std::vector<MapPoint*> GetTrackedMapPoints();
     std::vector<cv::KeyPoint> GetTrackedKeyPointsUn();
 
+    // Read all human poses into a vector with Eigen Matrix
+    void ReadAllHumanPoses(int nframes);
+    std::string folder_path;
+    void SetDataPath(std::string path);
+
 private:
+    //Human pose txt
+    std::vector<Eigen::MatrixXd> all_human_poses_left;
+    std::vector<Eigen::MatrixXd> all_human_poses_right;
+
 
     // Input sensor
     eSensor mSensor;
