@@ -57,6 +57,112 @@ Frame::Frame(const Frame &frame)
         SetPose(frame.mTcw);
 }
 
+Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeStamp, ORBextractor* extractorLeft, ORBextractor* extractorRight, ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth,
+             Eigen::MatrixXd left_human_poses, Eigen::MatrixXd right_human_poses)
+    :mpORBvocabulary(voc),mpORBextractorLeft(extractorLeft),mpORBextractorRight(extractorRight), mTimeStamp(timeStamp), mK(K.clone()),mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),
+     mpReferenceKF(static_cast<KeyFrame*>(NULL)),meHumanPosesLeft(left_human_poses),meHumanPosesRight(right_human_poses)
+{
+    // Frame ID
+    mnId=nNextId++;
+
+    // Scale Level Info
+    mnScaleLevels = mpORBextractorLeft->GetLevels();
+    mfScaleFactor = mpORBextractorLeft->GetScaleFactor();
+    mfLogScaleFactor = log(mfScaleFactor);
+    mvScaleFactors = mpORBextractorLeft->GetScaleFactors();
+    mvInvScaleFactors = mpORBextractorLeft->GetInverseScaleFactors();
+    mvLevelSigma2 = mpORBextractorLeft->GetScaleSigmaSquares();
+    mvInvLevelSigma2 = mpORBextractorLeft->GetInverseScaleSigmaSquares();
+
+    // ORB extraction
+    thread threadLeft(&Frame::ExtractORB,this,0,imLeft);
+    thread threadRight(&Frame::ExtractORB,this,1,imRight);
+    threadLeft.join();
+    threadRight.join();
+
+    N = mvKeys.size();
+
+    if(mvKeys.empty())
+        return;
+
+    UndistortKeyPoints();
+
+    ComputeStereoMatches();
+
+    //TODO human pose undistorted
+    ComputeHumanPoseTriangulation();
+
+    mvpMapPoints = vector<MapPoint*>(N,static_cast<MapPoint*>(NULL));
+    mvbOutlier = vector<bool>(N,false);
+
+
+    // This is done only for the first Frame (or after a change in the calibration)
+    if(mbInitialComputations)
+    {
+        ComputeImageBounds(imLeft);
+
+        mfGridElementWidthInv=static_cast<float>(FRAME_GRID_COLS)/(mnMaxX-mnMinX);
+        mfGridElementHeightInv=static_cast<float>(FRAME_GRID_ROWS)/(mnMaxY-mnMinY);
+
+        fx = K.at<float>(0,0);
+        fy = K.at<float>(1,1);
+        cx = K.at<float>(0,2);
+        cy = K.at<float>(1,2);
+        invfx = 1.0f/fx;
+        invfy = 1.0f/fy;
+
+        mbInitialComputations=false;
+    }
+
+    mb = mbf/fx;
+
+    AssignFeaturesToGrid();
+}
+
+void Frame::ComputeHumanPoseTriangulation(){
+  int nHumansLeft = meHumanPosesLeft.rows();
+  int nHumansRight = meHumanPosesRight.rows();
+
+  if (nHumansLeft < 1 && nHumansRight < 1){
+    std::cerr << "no human poes readed" << '\n';
+  }
+  else{
+    //Initialize the first human body,
+    //Now we only consider the first humans detected
+    //TODO multi human
+
+    //left human
+    human_pose mhuman;
+    mhuman.human_idx = 1;
+
+    for (int i =0;i<18;i++){
+      float score;score = meHumanPosesLeft.row(0)(i*3+2);
+      int u,v; u = meHumanPosesLeft.row(0)(i*3); v = meHumanPosesLeft.row(0)(i*3+1);
+
+      posekeypoints mhumankeys;
+      mhumankeys.first = u; mhumankeys.second = v;
+      mhuman.vHumanKeyPoints.push_back(mhumankeys);
+      mhuman.vKeysConfidence.push_back(score);
+
+      u = meHumanPosesRight.row(0)(i*3); v = meHumanPosesRight.row(0)(i*3+1);
+      score = meHumanPosesRight.row(0)(i*3+2);
+
+      posekeypoints mhumankeysright;
+      mhumankeysright.first = u; mhumankeysright.second = v;
+      mhuman.vHumanKeyPointsRight.push_back(mhumankeysright);
+      mhuman.vKeysConfidenceRight.push_back(score);
+
+      float disparity = mhumankeys.first - mhumankeysright.first;//u-uR
+      if (disparity <= 0) {
+        disparity = 0.01;
+        mhuman.vbIsBad.push_back(true);
+      }
+      else{mhuman.vbIsBad.push_back(false);}
+      mhuman.vHumanKeyDepths.push_back(mbf/disparity);
+    }
+    mvHumanPoses.push_back(mhuman);
+  }
+}
 
 Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeStamp, ORBextractor* extractorLeft, ORBextractor* extractorRight, ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth)
     :mpORBvocabulary(voc),mpORBextractorLeft(extractorLeft),mpORBextractorRight(extractorRight), mTimeStamp(timeStamp), mK(K.clone()),mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),
@@ -89,7 +195,7 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 
     ComputeStereoMatches();
 
-    mvpMapPoints = vector<MapPoint*>(N,static_cast<MapPoint*>(NULL));    
+    mvpMapPoints = vector<MapPoint*>(N,static_cast<MapPoint*>(NULL));
     mvbOutlier = vector<bool>(N,false);
 
 
@@ -125,7 +231,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 
     // Scale Level Info
     mnScaleLevels = mpORBextractorLeft->GetLevels();
-    mfScaleFactor = mpORBextractorLeft->GetScaleFactor();    
+    mfScaleFactor = mpORBextractorLeft->GetScaleFactor();
     mfLogScaleFactor = log(mfScaleFactor);
     mvScaleFactors = mpORBextractorLeft->GetScaleFactors();
     mvInvScaleFactors = mpORBextractorLeft->GetInverseScaleFactors();
@@ -259,7 +365,7 @@ void Frame::SetPose(cv::Mat Tcw)
 }
 
 void Frame::UpdatePoseMatrices()
-{ 
+{
     mRcw = mTcw.rowRange(0,3).colRange(0,3);
     mRwc = mRcw.t();
     mtcw = mTcw.rowRange(0,3).col(3);
@@ -271,7 +377,7 @@ bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
     pMP->mbTrackInView = false;
 
     // 3D in absolute coordinates
-    cv::Mat P = pMP->GetWorldPos(); 
+    cv::Mat P = pMP->GetWorldPos();
 
     // 3D in camera coordinates
     const cv::Mat Pc = mRcw*P+mtcw;
@@ -677,6 +783,28 @@ cv::Mat Frame::UnprojectStereo(const int &i)
     }
     else
         return cv::Mat();
+}
+
+std::vector<cv::Mat> Frame::UnprojectStereoHuman(const int &i)
+{
+  human_pose mHuman = mvHumanPoses[i];
+  std::vector<cv::Mat> v;
+  for (int itr =0;itr<18;itr++){
+    cv::Mat x3DHumanKey;
+    const float z = mHuman.vHumanKeyDepths[itr];
+    if(z>0)
+    {
+        const float u = mHuman.vHumanKeyPoints[itr].first;
+        const float v = mHuman.vHumanKeyPoints[itr].second;
+        const float x = (u-cx)*z*invfx;
+        const float y = (v-cy)*z*invfy;
+        cv::Mat x3Dc = (cv::Mat_<float>(3,1) << x, y, z);
+        x3DHumanKey = mRwc*x3Dc+mOw;
+    }
+    v.push_back(x3DHumanKey);
+  }
+
+  return v;
 }
 
 } //namespace ORB_SLAM

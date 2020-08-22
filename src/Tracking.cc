@@ -103,6 +103,9 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
     int nRGB = fSettings["Camera.RGB"];
     mbRGB = nRGB;
 
+    int nHumanDetect = fSettings["Human.OK"];
+    mbHumanDetect = nHumanDetect;
+
     if(mbRGB)
         cout << "- color order: RGB (ignored if grayscale)" << endl;
     else
@@ -203,6 +206,45 @@ cv::Mat Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat &imRe
     return mCurrentFrame.mTcw.clone();
 }
 
+cv::Mat Tracking::GrabImageStereoHuman(const cv::Mat &imRectLeft, const cv::Mat &imRectRight, const double &timestamp, const int &counter)
+{
+    mImGray = imRectLeft;
+    cv::Mat imGrayRight = imRectRight;
+
+    if(mImGray.channels()==3)
+    {
+        if(mbRGB)
+        {
+            cvtColor(mImGray,mImGray,CV_RGB2GRAY);
+            cvtColor(imGrayRight,imGrayRight,CV_RGB2GRAY);
+        }
+        else
+        {
+            cvtColor(mImGray,mImGray,CV_BGR2GRAY);
+            cvtColor(imGrayRight,imGrayRight,CV_BGR2GRAY);
+        }
+    }
+    else if(mImGray.channels()==4)
+    {
+        if(mbRGB)
+        {
+            cvtColor(mImGray,mImGray,CV_RGBA2GRAY);
+            cvtColor(imGrayRight,imGrayRight,CV_RGBA2GRAY);
+        }
+        else
+        {
+            cvtColor(mImGray,mImGray,CV_BGRA2GRAY);
+            cvtColor(imGrayRight,imGrayRight,CV_BGRA2GRAY);
+        }
+    }
+
+    mCurrentFrame = Frame(mImGray,imGrayRight,timestamp,mpORBextractorLeft,mpORBextractorRight,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth,
+                          mpSystem->all_human_poses_left[counter], mpSystem->all_human_poses_right[counter]);
+
+    Track();
+
+    return mCurrentFrame.mTcw.clone();
+}
 
 cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const double &timestamp)
 {
@@ -304,9 +346,9 @@ void Tracking::Track()
                 // Local Mapping might have changed some MapPoints tracked in last frame
                 CheckReplacedInLastFrame();
 
-                if(mVelocity.empty() || mCurrentFrame.mnId<mnLastRelocFrameId+2)
+                if(mVelocity.empty() || mCurrentFrame.mnId<mnLastRelocFrameId+2)//is it take keyframe two frame per
                 {
-                    bOK = TrackReferenceKeyFrame();
+                    bOK = TrackReferenceKeyFrame(); //search BoW
                 }
                 else
                 {
@@ -417,7 +459,7 @@ void Tracking::Track()
         // Update drawer
         mpFrameDrawer->Update(this);
 
-        // If tracking were good, check if we insert a keyframe
+        // If tracking were good, check if we insert a ke yframe
         if(bOK)
         {
             // Update motion model
@@ -536,6 +578,10 @@ void Tracking::StereoInitialization()
                 mCurrentFrame.mvpMapPoints[i]=pNewMP;
             }
         }
+        //Unproject stereo Human pose
+        std::vector<cv::Mat> *pvHuman = new std::vector<cv::Mat>;
+        *pvHuman = mCurrentFrame.UnprojectStereoHuman(0);
+        mpMap->AddMapHumanPose(pvHuman);
 
         cout << "New map created with " << mpMap->MapPointsInMap() << " points" << endl;
 
@@ -916,7 +962,7 @@ bool Tracking::TrackWithMotionModel()
             else if(mCurrentFrame.mvpMapPoints[i]->Observations()>0)
                 nmatchesMap++;
         }
-    }    
+    }
 
     if(mbOnlyTracking)
     {
@@ -1129,6 +1175,11 @@ void Tracking::CreateNewKeyFrame()
                 if(vDepthIdx[j].first>mThDepth && nPoints>100)
                     break;
             }
+            //Unproject stereo Human pose
+            std::vector<cv::Mat> *pvHuman = new std::vector<cv::Mat>;
+            *pvHuman = mCurrentFrame.UnprojectStereoHuman(0);
+            mpMap->AddMapHumanPose(pvHuman);
+
         }
     }
 

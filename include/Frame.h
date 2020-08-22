@@ -31,6 +31,7 @@
 #include "ORBextractor.h"
 
 #include <opencv2/opencv.hpp>
+#include<Eigen/Dense>
 
 namespace ORB_SLAM2
 {
@@ -40,6 +41,19 @@ namespace ORB_SLAM2
 class MapPoint;
 class KeyFrame;
 
+// the struct to store human pose consider for a new class or not
+// TODO the position to define this struct
+typedef std::pair<int, int> posekeypoints;
+struct human_pose{
+  int human_idx;
+  std::vector<posekeypoints> vHumanKeyPoints;
+  std::vector<posekeypoints> vHumanKeyPointsRight;
+  std::vector<float> vKeysConfidence;
+  std::vector<float> vKeysConfidenceRight;
+  std::vector<float> vHumanKeyDepths;
+  std::vector<bool> vbIsBad;
+};
+
 class Frame
 {
 public:
@@ -47,6 +61,10 @@ public:
 
     // Copy constructor.
     Frame(const Frame &frame);
+
+    // Constructor for stereo cameras and human poses
+    Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeStamp, ORBextractor* extractorLeft, ORBextractor* extractorRight, ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth,
+          Eigen::MatrixXd left_human_poses, Eigen::MatrixXd right_human_poses);
 
     // Constructor for stereo cameras.
     Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeStamp, ORBextractor* extractorLeft, ORBextractor* extractorRight, ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth);
@@ -92,11 +110,17 @@ public:
     // If there is a match, depth is computed and the right coordinate associated to the left keypoint is stored.
     void ComputeStereoMatches();
 
+    // compute the stereo matching between human body key points, and do triangulatin for the depth
+    void ComputeHumanPoseTriangulation();
+
     // Associate a "right" coordinate to a keypoint if there is valid depth in the depthmap.
     void ComputeStereoFromRGBD(const cv::Mat &imDepth);
 
     // Backprojects a keypoint (if stereo/depth info available) into 3D world coordinates.
     cv::Mat UnprojectStereo(const int &i);
+
+    // Backprojects the keypoints on the human pose (if stereo/depth info available) into 3D world coordinates.
+    std::vector<cv::Mat> UnprojectStereoHuman(const int &i);
 
 public:
     // Vocabulary used for relocalization.
@@ -136,6 +160,9 @@ public:
     // In the RGB-D case, RGB images can be distorted.
     std::vector<cv::KeyPoint> mvKeys, mvKeysRight;
     std::vector<cv::KeyPoint> mvKeysUn;
+
+    // Vector of human body key points on the right frame and the left frame.
+    std::vector<human_pose> mvHumanPoses;
 
     // Corresponding stereo coordinate and depth for each keypoint.
     // "Monocular" keypoints have a negative value.
@@ -186,7 +213,8 @@ public:
     static float mnMaxY;
 
     static bool mbInitialComputations;
-
+    // Eigen Matrix passed from Tracking, each row represent a human N * 54
+    Eigen::MatrixXd meHumanPosesLeft, meHumanPosesRight;
 
 private:
 

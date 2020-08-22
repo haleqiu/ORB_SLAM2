@@ -84,7 +84,7 @@ cv::Mat FrameDrawer::DrawFrame()
                 cv::line(im,vIniKeys[i].pt,vCurrentKeys[vMatches[i]].pt,
                         cv::Scalar(0,255,0));
             }
-        }        
+        }
     }
     else if(state==Tracking::OK) //TRACKING
     {
@@ -117,6 +117,26 @@ cv::Mat FrameDrawer::DrawFrame()
                 }
             }
         }
+    }
+    // Drwa the human poses on each frame;
+    if (1){
+      const float r = 5;
+      for (std::vector<human_pose>::iterator humant=mvHumans.begin(); humant!=mvHumans.end(); ++humant){
+        for (int iter = 0; iter < 18; iter ++){
+          cv::Point2f pt1,pt2;
+          pt1.x=humant->vHumanKeyPoints[iter].first-r;
+          pt1.y=humant->vHumanKeyPoints[iter].second-r;
+          pt2.x=humant->vHumanKeyPoints[iter].first+r;
+          pt2.y=humant->vHumanKeyPoints[iter].second+r;
+
+          cv::Point2f pt;
+          pt.x=humant->vHumanKeyPoints[iter].first;
+          pt.y=humant->vHumanKeyPoints[iter].second;
+
+          cv::rectangle(im,pt1,pt2,cv::Scalar(255,255,0));
+          cv::circle(im,pt,2,cv::Scalar(255,255,0),-1);
+        }
+      }
     }
 
     cv::Mat imWithInfo;
@@ -168,6 +188,7 @@ void FrameDrawer::Update(Tracking *pTracker)
 {
     unique_lock<mutex> lock(mMutex);
     pTracker->mImGray.copyTo(mIm);
+    mvHumans = pTracker->mCurrentFrame.mvHumanPoses;// TODO: visulize based on the cofidence
     mvCurrentKeys=pTracker->mCurrentFrame.mvKeys;
     N = mvCurrentKeys.size();
     mvbVO = vector<bool>(N,false);

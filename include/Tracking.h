@@ -51,7 +51,7 @@ class LoopClosing;
 class System;
 
 class Tracking
-{  
+{
 
 public:
     Tracking(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Map* pMap,
@@ -61,6 +61,7 @@ public:
     cv::Mat GrabImageStereo(const cv::Mat &imRectLeft,const cv::Mat &imRectRight, const double &timestamp);
     cv::Mat GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const double &timestamp);
     cv::Mat GrabImageMonocular(const cv::Mat &im, const double &timestamp);
+    cv::Mat GrabImageStereoHuman(const cv::Mat &imRectLeft, const cv::Mat &imRectRight, const double &timestamp, const int &counter);
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
     void SetLoopClosing(LoopClosing* pLoopClosing);
@@ -150,6 +151,8 @@ protected:
     // "zero-drift" localization to the map.
     bool mbVO;
 
+    bool mbHumanDetect;
+
     //Other Thread Pointers
     LocalMapping* mpLocalMapper;
     LoopClosing* mpLoopClosing;
@@ -169,10 +172,10 @@ protected:
     KeyFrame* mpReferenceKF;
     std::vector<KeyFrame*> mvpLocalKeyFrames;
     std::vector<MapPoint*> mvpLocalMapPoints;
-    
+
     // System
     System* mpSystem;
-    
+
     //Drawers
     Viewer* mpViewer;
     FrameDrawer* mpFrameDrawer;

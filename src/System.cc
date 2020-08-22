@@ -113,7 +113,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     mpLoopCloser->SetLocalMapper(mpLocalMapper);
 }
 
-cv::Mat System::TrackStereoHuman(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp)
+cv::Mat System::TrackStereoHuman(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp, const int counter)
 {
   if(mSensor!=STEREO)
   {
@@ -154,8 +154,8 @@ cv::Mat System::TrackStereoHuman(const cv::Mat &imLeft, const cv::Mat &imRight, 
       mbReset = false;
   }
   }
-  
-  cv::Mat Tcw = mpTracker->GrabImageStereo(imLeft,imRight,timestamp);
+
+  cv::Mat Tcw = mpTracker->GrabImageStereoHuman(imLeft,imRight,timestamp,counter);
 
   unique_lock<mutex> lock2(mMutexState);
   mTrackingState = mpTracker->mState;

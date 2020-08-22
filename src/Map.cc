@@ -52,6 +52,13 @@ void Map::EraseMapPoint(MapPoint *pMP)
     // Delete the MapPoint
 }
 
+void Map::AddMapHumanPose(std::vector<cv::Mat> *v)
+{
+    unique_lock<mutex> lock(mMutexMap);
+    msvHumanPose.push_back(v);
+}
+// TODO Earse HumanPose
+
 void Map::EraseKeyFrame(KeyFrame *pKF)
 {
     unique_lock<mutex> lock(mMutexMap);
@@ -77,6 +84,12 @@ int Map::GetLastBigChangeIdx()
 {
     unique_lock<mutex> lock(mMutexMap);
     return mnBigChangeIdx;
+}
+
+std::vector<std::vector<cv::Mat>*> Map::GetAllHumanPoses()
+{
+  unique_lock<mutex> lock(mMutexMap);
+  return msvHumanPose;
 }
 
 vector<KeyFrame*> Map::GetAllKeyFrames()

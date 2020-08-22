@@ -25,6 +25,7 @@
 #include<string>
 #include<thread>
 #include<opencv2/core/core.hpp>
+#include <unistd.h>
 
 #include "Tracking.h"
 #include "FrameDrawer.h"
@@ -56,6 +57,10 @@ public:
         RGBD=2
     };
 
+    //Human pose txt
+    std::vector<Eigen::MatrixXd> all_human_poses_left;
+    std::vector<Eigen::MatrixXd> all_human_poses_right;
+
 public:
 
     // Initialize the SLAM system. It launches the Local Mapping, Loop Closing and Viewer threads.
@@ -70,7 +75,7 @@ public:
     // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
     // Returns the camera pose (empty if tracking fails).
     // the human pose will be inputed as Eigen
-    cv::Mat TrackStereoHuman(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp);
+    cv::Mat TrackStereoHuman(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp, const int counter);
 
     // Process the given rgbd frame. Depthmap must be registered to the RGB frame.
     // Input image: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
@@ -134,9 +139,6 @@ public:
     void SetDataPath(std::string path);
 
 private:
-    //Human pose txt
-    std::vector<Eigen::MatrixXd> all_human_poses_left;
-    std::vector<Eigen::MatrixXd> all_human_poses_right;
 
 
     // Input sensor
