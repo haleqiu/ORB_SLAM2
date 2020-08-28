@@ -17,8 +17,8 @@
 * You should have received a copy of the GNU General Public License
 * along with ORB-SLAM2. If not, see <http://www.gnu.org/licenses/>.
 */
-
 #include "MapDrawer.h"
+#include "MapHumanPose.h"
 #include "MapPoint.h"
 #include "KeyFrame.h"
 #include <pangolin/pangolin.h>
@@ -222,19 +222,30 @@ void MapDrawer::DrawCurrentHumanPose(){
     glLineWidth(2);
     glColor3f(0.0f,1.0f,1.0f);
     glBegin(GL_LINES);
-    const vector<std::vector<cv::Mat>*> &allHumanPoses  = mpMap->GetAllHumanPoses();
+    const vector<MapHumanPose*> &allHumanPoses  = mpMap->GetAllMapHumanPoses();
 
     for (int human_id = 0; human_id<allHumanPoses.size(); human_id++){
       for(int itr = 0; itr < 13; itr++){
         int pose1, pose2; pose1 = mpMap->body1[itr]; pose2 = mpMap->body2[itr];
         // std::cerr << vHuman << '\n';
-        cv::Mat pos1 = (allHumanPoses[human_id])->at(pose1);
-        cv::Mat pos2 = (allHumanPoses[human_id])->at(pose2);
-        Eigen::Vector3f colors = mpMap->colormap.at(itr);
-        glColor3f(colors[0], colors[1], colors[2]);
 
-        glVertex3f(pos1.at<float>(0),pos1.at<float>(1),pos1.at<float>(2));
-        glVertex3f(pos2.at<float>(0),pos2.at<float>(1),pos2.at<float>(2));
+        bool isBad1 = allHumanPoses[human_id]->isBad(pose1);
+        bool isBad2 = allHumanPoses[human_id]->isBad(pose2);
+
+        if (isBad1 || isBad2){
+          continue;
+          std::cerr << itr << '\n';
+        }
+        else{
+          cv::Mat pos1 = allHumanPoses[human_id]->GetHumanKeyPos(pose1);
+          cv::Mat pos2 = allHumanPoses[human_id]->GetHumanKeyPos(pose2);
+
+          Eigen::Vector3f colors = mpMap->colormap.at(itr);
+          glColor3f(colors[0], colors[1], colors[2]);
+
+          glVertex3f(pos1.at<float>(0),pos1.at<float>(1),pos1.at<float>(2));
+          glVertex3f(pos2.at<float>(0),pos2.at<float>(1),pos2.at<float>(2));
+        }
       }
     }
     glEnd();

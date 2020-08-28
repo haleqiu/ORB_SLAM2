@@ -20,6 +20,9 @@
 
 #include "MapPoint.h"
 #include "ORBmatcher.h"
+#include"KeyFrame.h"
+#include"Frame.h"
+#include"Map.h"
 
 #include<mutex>
 

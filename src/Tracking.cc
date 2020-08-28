@@ -29,6 +29,7 @@
 #include"Converter.h"
 #include"Map.h"
 #include"Initializer.h"
+#include"MapHumanTrajactory.h"
 
 #include"Optimizer.h"
 #include"PnPsolver.h"
@@ -104,7 +105,9 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
     mbRGB = nRGB;
 
     int nHumanDetect = fSettings["Human.OK"];
+    int nUseTrueTrackId = fSettings["Human.UseTrackedId"];
     mbHumanDetect = nHumanDetect;
+    mbUseTrueTrackId = nUseTrueTrackId;
 
     if(mbRGB)
         cout << "- color order: RGB (ignored if grayscale)" << endl;
@@ -237,10 +240,8 @@ cv::Mat Tracking::GrabImageStereoHuman(const cv::Mat &imRectLeft, const cv::Mat 
             cvtColor(imGrayRight,imGrayRight,CV_BGRA2GRAY);
         }
     }
-
     mCurrentFrame = Frame(mImGray,imGrayRight,timestamp,mpORBextractorLeft,mpORBextractorRight,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth,
                           mpSystem->all_human_poses_left[counter], mpSystem->all_human_poses_right[counter]);
-
     Track();
 
     return mCurrentFrame.mTcw.clone();
@@ -578,11 +579,30 @@ void Tracking::StereoInitialization()
                 mCurrentFrame.mvpMapPoints[i]=pNewMP;
             }
         }
-        //Unproject stereo Human pose
-        std::vector<cv::Mat> *pvHuman = new std::vector<cv::Mat>;
-        *pvHuman = mCurrentFrame.UnprojectStereoHuman(0);
-        mpMap->AddMapHumanPose(pvHuman);
+        if (mCurrentFrame.mnHumanObserved > 0){
+          //Unproject stereo the only Human pose
+          std::vector<cv::Mat> pvHuman = mCurrentFrame.UnprojectStereoHuman(0);
+          std::vector<bool> isBadHuman = mCurrentFrame.IsHumanInitBad(0);
+          MapHumanPose* mpHumanPose = new MapHumanPose(pvHuman,isBadHuman,pKFini,mpMap);
+          mpMap->AddMapHumanPose(mpHumanPose);
 
+          if (mbUseTrueTrackId){
+            //TODO tracking the human pose
+              mpHumanPose->mnTrackId = 0;
+              if (mpHumanPose->mnTrackId >= 0){
+                  if (mmpLocalHumanTrajactory.count(mpHumanPose->mnTrackId)>0){
+                      MapHumanTrajactory* mpHumanTrajactory = mmpLocalHumanTrajactory[mpHumanPose->mnTrackId];
+                      mpHumanTrajactory->mvAllHumanTrajactory.push_back(mpHumanPose);
+                  }
+                  else{
+                      //Create a new mpHumanTrajactory
+                      MapHumanTrajactory* mpHumanTrajactory = new MapHumanTrajactory();
+                      mmpLocalHumanTrajactory[mpHumanTrajactory->mnId] = mpHumanTrajactory;
+                      mpHumanTrajactory->mvAllHumanTrajactory.push_back(mpHumanPose);
+                  }
+              }
+          }
+        }
         cout << "New map created with " << mpMap->MapPointsInMap() << " points" << endl;
 
         mpLocalMapper->InsertKeyFrame(pKFini);
@@ -1175,11 +1195,32 @@ void Tracking::CreateNewKeyFrame()
                 if(vDepthIdx[j].first>mThDepth && nPoints>100)
                     break;
             }
-            //Unproject stereo Human pose
-            std::vector<cv::Mat> *pvHuman = new std::vector<cv::Mat>;
-            *pvHuman = mCurrentFrame.UnprojectStereoHuman(0);
-            mpMap->AddMapHumanPose(pvHuman);
+            // Add the HumanPose observed
+            if (mCurrentFrame.mnHumanObserved > 0){
+                //Unproject stereo Human pose
+                //TODO consider multiple person
+                std::vector<cv::Mat> pvHuman = mCurrentFrame.UnprojectStereoHuman(0);
+                std::vector<bool> isBadHuman = mCurrentFrame.IsHumanInitBad(0);
 
+                MapHumanPose* mpHumanPose = new MapHumanPose(pvHuman,isBadHuman,pKF,mpMap);
+                mpMap->AddMapHumanPose(mpHumanPose);
+                if (mbUseTrueTrackId){
+                  //TODO tracking the human pose
+                    mpHumanPose->mnTrackId = 0;
+                    if (mpHumanPose->mnTrackId >= 0){
+                        if (mmpLocalHumanTrajactory.count(mpHumanPose->mnTrackId)>0){
+                            MapHumanTrajactory* mpHumanTrajactory = mmpLocalHumanTrajactory[mpHumanPose->mnTrackId];
+                            mpHumanTrajactory->mvAllHumanTrajactory.push_back(mpHumanPose);
+                        }
+                        else{
+                            //Create a new mpHumanTrajactory
+                            MapHumanTrajactory* mpHumanTrajactory = new MapHumanTrajactory();
+                            mmpLocalHumanTrajactory[mpHumanTrajactory->mnId] = mpHumanTrajactory;
+                            mpHumanTrajactory->mvAllHumanTrajactory.push_back(mpHumanPose);
+                        }
+                    }
+                }
+            }
         }
     }
 

@@ -53,7 +53,7 @@ int main(int argc, char **argv)
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
     ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::STEREO,true);
     SLAM.folder_path = string(argv[3]);
-    SLAM.ReadAllHumanPoses(255);//TODO:set param later
+    SLAM.ReadAllHumanPoses(nImages);
     // Vector for tracking time statistics
     vector<float> vTimesTrack;
     vTimesTrack.resize(nImages);
@@ -108,6 +108,7 @@ int main(int argc, char **argv)
             usleep((T-ttrack)*1e6);
     }
 
+    usleep(10000000);
     // Stop all threads
     SLAM.Shutdown();
 

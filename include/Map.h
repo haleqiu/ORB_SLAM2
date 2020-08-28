@@ -27,16 +27,19 @@
 #include <Eigen/Dense>
 
 #include <mutex>
+#include<opencv2/core/core.hpp>
+#include<opencv2/features2d/features2d.hpp>
 
 
 
 namespace ORB_SLAM2
 {
 
+class MapHumanPose;
 class MapPoint;
 class KeyFrame;
+class MapHumanTrajactory;
 
-typedef std::vector<cv::Mat> humanposes;
 class Map
 {
 public:
@@ -69,12 +72,14 @@ public:
     int GetLastBigChangeIdx();
 
     //MapHumanPose
-    void AddMapHumanPose(std::vector<cv::Mat>* v);
+    void AddMapHumanPose(MapHumanPose *pMapHumanPose);
+    void AddMapHumanTrajactory(MapHumanTrajactory *pMapHumanTrajactory);
 
     std::vector<KeyFrame*> GetAllKeyFrames();
     std::vector<MapPoint*> GetAllMapPoints();
     std::vector<MapPoint*> GetReferenceMapPoints();
-    std::vector<std::vector<cv::Mat>*> GetAllHumanPoses();
+    std::vector<MapHumanPose*> GetAllMapHumanPoses();
+    std::vector<MapHumanTrajactory*> GetAllMapHumanTrajactory();
 
     long unsigned int MapPointsInMap();
     long unsigned  KeyFramesInMap();
@@ -83,16 +88,18 @@ public:
 
     void clear();
 
-    vector<KeyFrame*> mvpKeyFrameOrigins;
+    std::vector<KeyFrame*> mvpKeyFrameOrigins;
 
     std::mutex mMutexMapUpdate;
 
     // This avoid that two points are created simultaneously in separate threads (id conflict)
     std::mutex mMutexPointCreation;
-    std::vector<std::vector<cv::Mat>*> msvHumanPose;// TODO consider the human pose in class and pointer in the future
 
 
 protected:
+    std::set<MapHumanPose*> mspHumanPose;// TODO consider the human pose in class and pointer in the future
+    std::set<MapHumanTrajactory*> mspHumanTrajactory;
+
     std::set<MapPoint*> mspMapPoints;
     std::set<KeyFrame*> mspKeyFrames;
 

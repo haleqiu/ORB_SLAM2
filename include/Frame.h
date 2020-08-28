@@ -23,6 +23,7 @@
 
 #include<vector>
 
+#include "MapHumanPose.h"
 #include "MapPoint.h"
 #include "Thirdparty/DBoW2/DBoW2/BowVector.h"
 #include "Thirdparty/DBoW2/DBoW2/FeatureVector.h"
@@ -40,19 +41,8 @@ namespace ORB_SLAM2
 
 class MapPoint;
 class KeyFrame;
-
-// the struct to store human pose consider for a new class or not
-// TODO the position to define this struct
-typedef std::pair<int, int> posekeypoints;
-struct human_pose{
-  int human_idx;
-  std::vector<posekeypoints> vHumanKeyPoints;
-  std::vector<posekeypoints> vHumanKeyPointsRight;
-  std::vector<float> vKeysConfidence;
-  std::vector<float> vKeysConfidenceRight;
-  std::vector<float> vHumanKeyDepths;
-  std::vector<bool> vbIsBad;
-};
+class MapHumanPose;
+struct human_pose;
 
 class Frame
 {
@@ -121,6 +111,8 @@ public:
 
     // Backprojects the keypoints on the human pose (if stereo/depth info available) into 3D world coordinates.
     std::vector<cv::Mat> UnprojectStereoHuman(const int &i);
+
+    std::vector<bool> IsHumanInitBad(const int &i);
 
 public:
     // Vocabulary used for relocalization.
@@ -215,6 +207,8 @@ public:
     static bool mbInitialComputations;
     // Eigen Matrix passed from Tracking, each row represent a human N * 54
     Eigen::MatrixXd meHumanPosesLeft, meHumanPosesRight;
+
+    int mnHumanObserved = 0;
 
 private:
 

@@ -49,6 +49,7 @@ class Map;
 class LocalMapping;
 class LoopClosing;
 class System;
+class MapHumanTrajactory;
 
 class Tracking
 {
@@ -116,6 +117,8 @@ public:
 
     void Reset();
 
+    bool mbUseTrueTrackId = false;
+
 protected:
 
     // Main tracking function. It is independent of the input sensor.
@@ -172,6 +175,7 @@ protected:
     KeyFrame* mpReferenceKF;
     std::vector<KeyFrame*> mvpLocalKeyFrames;
     std::vector<MapPoint*> mvpLocalMapPoints;
+    std::map<int, MapHumanTrajactory*> mmpLocalHumanTrajactory;
 
     // System
     System* mpSystem;

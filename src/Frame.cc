@@ -122,11 +122,12 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 void Frame::ComputeHumanPoseTriangulation(){
   int nHumansLeft = meHumanPosesLeft.rows();
   int nHumansRight = meHumanPosesRight.rows();
-
-  if (nHumansLeft < 1 && nHumansRight < 1){
+  if (nHumansLeft < 1 || nHumansRight < 1){
     std::cerr << "no human poes readed" << '\n';
+    return;
   }
   else{
+    mnHumanObserved = 1; //TODO the strategy to determine the number of human pose
     //Initialize the first human body,
     //Now we only consider the first humans detected
     //TODO multi human
@@ -136,21 +137,22 @@ void Frame::ComputeHumanPoseTriangulation(){
     mhuman.human_idx = 1;
 
     for (int i =0;i<18;i++){
-      float score;score = meHumanPosesLeft.row(0)(i*3+2);
+      float nlscore; nlscore = meHumanPosesLeft.row(0)(i*3+2);
+      float nrscore; nrscore = meHumanPosesRight.row(0)(i*3+2);
+
       int u,v; u = meHumanPosesLeft.row(0)(i*3); v = meHumanPosesLeft.row(0)(i*3+1);
 
       posekeypoints mhumankeys;
       mhumankeys.first = u; mhumankeys.second = v;
       mhuman.vHumanKeyPoints.push_back(mhumankeys);
-      mhuman.vKeysConfidence.push_back(score);
+      mhuman.vKeysConfidence.push_back(nlscore);
 
       u = meHumanPosesRight.row(0)(i*3); v = meHumanPosesRight.row(0)(i*3+1);
-      score = meHumanPosesRight.row(0)(i*3+2);
 
       posekeypoints mhumankeysright;
       mhumankeysright.first = u; mhumankeysright.second = v;
       mhuman.vHumanKeyPointsRight.push_back(mhumankeysright);
-      mhuman.vKeysConfidenceRight.push_back(score);
+      mhuman.vKeysConfidenceRight.push_back(nrscore);
 
       float disparity = mhumankeys.first - mhumankeysright.first;//u-uR
       if (disparity <= 0) {
@@ -159,6 +161,10 @@ void Frame::ComputeHumanPoseTriangulation(){
       }
       else{mhuman.vbIsBad.push_back(false);}
       mhuman.vHumanKeyDepths.push_back(mbf/disparity);
+
+      if ((nlscore <0.4) || (nrscore < 0.4)){
+        mhuman.vbIsBad.back() = true;//
+      }
     }
     mvHumanPoses.push_back(mhuman);
   }
@@ -804,6 +810,14 @@ std::vector<cv::Mat> Frame::UnprojectStereoHuman(const int &i)
     v.push_back(x3DHumanKey);
   }
 
+  return v;
+}
+
+std::vector<bool> Frame::IsHumanInitBad(const int &i)
+{
+  human_pose mHuman = mvHumanPoses[i];
+  std::vector<bool> v; // TODO
+  v = mvHumanPoses[i].vbIsBad;
   return v;
 }
 

@@ -19,6 +19,8 @@
 */
 
 #include "Map.h"
+#include "MapHumanPose.h"
+#include "MapHumanTrajactory.h"
 
 #include<mutex>
 
@@ -52,12 +54,19 @@ void Map::EraseMapPoint(MapPoint *pMP)
     // Delete the MapPoint
 }
 
-void Map::AddMapHumanPose(std::vector<cv::Mat> *v)
+void Map::AddMapHumanPose(MapHumanPose *pMapHumanPose)
 {
     unique_lock<mutex> lock(mMutexMap);
-    msvHumanPose.push_back(v);
+    mspHumanPose.insert(pMapHumanPose);
+}
+
+void Map::AddMapHumanTrajactory(MapHumanTrajactory *pMapHumanTrajactory)
+{
+    unique_lock<mutex> lock(mMutexMap);
+    mspHumanTrajactory.insert(pMapHumanTrajactory);
 }
 // TODO Earse HumanPose
+// TODO Earse mpHumanTrajactory
 
 void Map::EraseKeyFrame(KeyFrame *pKF)
 {
@@ -86,12 +95,6 @@ int Map::GetLastBigChangeIdx()
     return mnBigChangeIdx;
 }
 
-std::vector<std::vector<cv::Mat>*> Map::GetAllHumanPoses()
-{
-  unique_lock<mutex> lock(mMutexMap);
-  return msvHumanPose;
-}
-
 vector<KeyFrame*> Map::GetAllKeyFrames()
 {
     unique_lock<mutex> lock(mMutexMap);
@@ -102,6 +105,18 @@ vector<MapPoint*> Map::GetAllMapPoints()
 {
     unique_lock<mutex> lock(mMutexMap);
     return vector<MapPoint*>(mspMapPoints.begin(),mspMapPoints.end());
+}
+
+vector<MapHumanPose*> Map::GetAllMapHumanPoses()
+{
+    unique_lock<mutex> lock(mMutexMap);
+    return vector<MapHumanPose*>(mspHumanPose.begin(),mspHumanPose.end());
+}
+
+vector<MapHumanTrajactory*> Map::GetAllMapHumanTrajactory()
+{
+    unique_lock<mutex> lock(mMutexMap);
+    return vector<MapHumanTrajactory*>(mspHumanTrajactory.begin(),mspHumanTrajactory.end());
 }
 
 long unsigned int Map::MapPointsInMap()
